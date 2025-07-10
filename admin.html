@@ -39,6 +39,10 @@
       color: green;
       margin-bottom: 10px;
     }
+    .respuesta-area {
+      margin-top: 10px;
+      display: none;
+    }
     textarea {
       width: 100%;
       height: 80px;
@@ -56,6 +60,7 @@
       padding: 10px 15px;
       border-radius: 6px;
       cursor: pointer;
+      font-size: 14px;
     }
     .btn:hover {
       background-color: #2169c4;
@@ -102,55 +107,62 @@
     onAuthStateChanged(auth, (user) => {
       if (!user) {
         window.location.href = "login.html";
-      } else {
-        const mensajesRef = ref(db, "mensajes");
-
-        onValue(mensajesRef, (snapshot) => {
-          const contenedor = document.getElementById("mensajes");
-          contenedor.innerHTML = "";
-
-          snapshot.forEach(child => {
-            const data = child.val();
-            const key = child.key;
-
-            const div = document.createElement("div");
-            div.className = "mensaje";
-
-            const estado = data.respuesta ? '✅ Respondido' : '❌ Sin responder';
-            const colorEstado = data.respuesta ? 'green' : 'red';
-
-            div.innerHTML = `
-              <div class="texto">📩 ${data.texto || "(Mensaje vacío)"}</div>
-              <div class="fecha">${new Date(data.fecha).toLocaleString()}</div>
-              <div class="estado" style="color: ${colorEstado};">${estado}</div>
-              <textarea placeholder="Escribe tu respuesta..." id="respuesta-${key}">${data.respuesta || ""}</textarea>
-              <button class="btn" onclick="responder('${key}', '${user.email}')">Enviar respuesta</button>
-            `;
-
-            contenedor.appendChild(div);
-          });
-        });
+        return;
       }
+
+      const mensajesRef = ref(db, "mensajes");
+      onValue(mensajesRef, (snapshot) => {
+        const contenedor = document.getElementById("mensajes");
+        contenedor.innerHTML = "";
+
+        snapshot.forEach(child => {
+          const data = child.val();
+          const key = child.key;
+
+          const div = document.createElement("div");
+          div.className = "mensaje";
+
+          div.innerHTML = `
+            <div class="texto">📩 ${data.texto || "(Mensaje vacío)"}</div>
+            <div class="fecha">${new Date(data.fecha).toLocaleString()}</div>
+            <div class="estado" style="color: ${data.respuesta ? 'green' : 'red'};">
+              ${data.respuesta ? '✅ Respondido' : '❌ Sin responder'}
+            </div>
+            <button class="btn" onclick="mostrarRespuesta('${key}')">Responder</button>
+            <div class="respuesta-area" id="respuesta-area-${key}">
+              <textarea id="respuesta-${key}" placeholder="Escribe tu respuesta..."></textarea>
+              <button class="btn" onclick="enviarRespuesta('${key}', '${user.email}')">Enviar respuesta</button>
+            </div>
+          `;
+
+          contenedor.appendChild(div);
+        });
+      });
     });
 
-    window.responder = function (mensajeId, adminEmail) {
-      const textarea = document.getElementById("respuesta-" + mensajeId);
-      const respuesta = textarea.value.trim();
+    window.mostrarRespuesta = function (id) {
+      const area = document.getElementById("respuesta-area-" + id);
+      area.style.display = area.style.display === "none" ? "block" : "none";
+    };
 
+    window.enviarRespuesta = function (id, email) {
+      const respuesta = document.getElementById("respuesta-" + id).value.trim();
       if (respuesta === "") {
         alert("⚠️ La respuesta no puede estar vacía.");
         return;
       }
 
-      const mensajeRef = ref(db, "mensajes/" + mensajeId);
+      const mensajeRef = ref(getDatabase(), "mensajes/" + id);
       update(mensajeRef, {
         respuesta: respuesta,
-        respondidoPor: adminEmail
+        respondidoPor: email,
+        respondidoEn: new Date().toISOString()
       }).then(() => {
-        alert("✅ Respuesta guardada correctamente.");
+        alert("✅ Respuesta enviada.");
+        location.reload();
       }).catch((error) => {
-        alert("❌ Error al guardar la respuesta.");
         console.error(error);
+        alert("❌ Error al enviar respuesta.");
       });
     };
   </script>
